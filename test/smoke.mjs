@@ -108,13 +108,17 @@ try {
   assert.match(csp, /^default-src 'none'; script-src 'nonce-/);
   assert.equal(await webview.locator('.square').count(), 64);
   await text(status, 'White to move');
-  await square('f2').dragTo(square('f3'));
+  assert.equal(await square('f2').evaluate(node => node.draggable), false);
+  const grip = square('f2').locator('.piece-grip[draggable="true"]');
+  await grip.dragTo(square('f3'));
   await text(status, 'Black to move');
   assert.match(await square('f3').getAttribute('aria-label'), /White pawn/);
   await move('e7', 'e5');
   await move('g2', 'g4');
   await move('d8', 'h4');
   await text(status, 'Black wins · Checkmate');
+  await webview.locator('.game-status.mate').waitFor();
+  await webview.locator('.player.mating-player').waitFor();
   assert.match(await square('e1').getAttribute('aria-label'), /in check/);
   await byButton('Undo').click();
   await text(status, 'Black to move');
@@ -128,6 +132,32 @@ try {
   await text(status, 'Black to move');
   assert.match(await square('g4').getAttribute('aria-label'), /White pawn/);
   console.log('Two-player clocks, drag, mate, undo, flip, two piece styles, and view reopen passed');
+
+  await byButton('Puzzles').click();
+  await webview.getByText(/to move · Find the best move/).waitFor();
+  await byButton('Hint').click();
+  const marked = webview.locator('.square.puzzle-hint');
+  await marked.waitFor();
+  const hintedSquare = await marked.getAttribute('data-square');
+  await text(status, `Hint · Move the piece on ${hintedSquare}`);
+  await byButton('Settings').click();
+  await webview.getByLabel('Language', { exact: true }).selectOption({ label: 'Русский' });
+  await byButton('Save settings').click();
+  await text(status, `Подсказка · Походите фигурой с ${hintedSquare}`);
+  assert.equal(await webview.locator('html').getAttribute('lang'), 'ru');
+  await byButton('Настройки').click();
+  await webview.getByLabel('Язык', { exact: true }).selectOption({ label: 'English' });
+  await byButton('Сохранить').click();
+  await text(status, `Hint · Move the piece on ${hintedSquare}`);
+  await byButton('Show solution').click();
+  await text(status, 'Solution shown');
+  await webview.locator('.puzzle-solution').waitFor();
+  await byButton('Try again').click();
+  await webview.getByText(/to move · Find the best move/).waitFor();
+  await byButton('Back to games').click();
+  await text(status, 'Black to move');
+  assert.match(await square('g4').getAttribute('aria-label'), /White pawn/);
+  console.log('Offline puzzle, hint, solution, retry, and returning to the ongoing game passed');
 
   await setup('Two players', null, false);
   await text(status, 'White to move');
@@ -151,7 +181,14 @@ try {
   console.log('Keyboard moves and the promotion picker passed');
 
   await settings('Classic', 'Figurines', '3 s');
-  await setup('Play Stockfish', 'White', false);
+  await setup('Play Stockfish', 'Random', false);
+  await webview.getByText('You', { exact: true }).waitFor();
+  await byButton('New Game').click();
+  await byButton('Play Stockfish').click();
+  const color = webview.getByLabel('Play as');
+  assert.equal(await color.locator('option:checked').textContent(), 'Random');
+  await color.selectOption({ label: 'White' });
+  await byButton('Start game').click();
   await text(status, 'White to move');
   await move('e2', 'e4');
   await text(status, 'Stockfish is thinking…');
@@ -180,29 +217,52 @@ try {
   await move('e7', 'e5');
   await text(status, 'Stockfish is thinking…');
   await text(status, 'Black to move');
-  await webview.locator('.history summary').click();
-  await webview.locator('.move-pair').first().waitFor();
+  await byButton('Settings').click();
+  await webview.getByLabel('Language', { exact: true }).selectOption({ label: 'Русский' });
+  await byButton('Save settings').click();
+  await byButton('Настройки').waitFor();
+
   const innerFrame = page.frameLocator('iframe.webview').locator('#active-frame');
   const originalWidth = await innerFrame.evaluate(node => node.getAttribute('style'));
-  for (const width of [240, 500]) {
+  for (const width of [240, 320, 500]) {
     await innerFrame.evaluate((node, size) => { node.style.width = `${size}px`; }, width);
     const dimensions = await webview.locator('.board').evaluate(board => {
       const bounds = board.getBoundingClientRect();
+      const buttons = [...document.querySelectorAll('.toolbar button')];
+      const splitWords = buttons.flatMap(button => {
+        const label = button.firstChild;
+        if (!(label instanceof Text)) throw new Error('Expected a toolbar label');
+        return [...label.data.matchAll(/\S+/gu)].filter(word => {
+          const range = document.createRange();
+          range.setStart(label, word.index);
+          range.setEnd(label, word.index + word[0].length);
+          return range.getClientRects().length !== 1;
+        }).map(word => word[0]);
+      });
       return { viewport: window.innerWidth, width: bounds.width, height: bounds.height,
-        scrollWidth: document.documentElement.scrollWidth };
+        scrollWidth: document.documentElement.scrollWidth, splitWords,
+        toolbarRows: new Set(buttons.map(button => button.getBoundingClientRect().top)).size };
     });
     assert.equal(dimensions.viewport, width);
     assert.ok(Math.abs(dimensions.width - dimensions.height) < 1);
     assert.ok(dimensions.scrollWidth <= width);
+    assert.deepEqual(dimensions.splitWords, []);
+    assert.equal(dimensions.toolbarRows, width < 400 ? 2 : 1);
   }
   await innerFrame.evaluate((node, style) => {
     if (style === null) node.removeAttribute('style');
     else node.setAttribute('style', style);
   }, originalWidth);
+  await byButton('Настройки').click();
+  await webview.getByLabel('Язык', { exact: true }).selectOption({ label: 'English' });
+  await byButton('Сохранить').click();
+  await text(status, 'Black to move');
+  await webview.locator('.history summary').click();
+  await webview.locator('.move-pair').first().waitFor();
   if (process.env.VSCHESS_LIGHT === '1') {
     await webview.locator('body.vscode-light').waitFor();
   }
-  console.log('Sidebar board fits 240 px and 500 px webview widths');
+  console.log('Sidebar board and Russian controls fit 240 px, 320 px, and 500 px webview widths');
   if (screenshot) {
     const sidebar = await page.locator('.part.sidebar').boundingBox();
     const options = await webview.locator('.game .more').boundingBox();
@@ -210,12 +270,25 @@ try {
     await page.screenshot({ path: screenshot, clip: { ...sidebar, height } });
   }
   console.log('Stockfish modes as White and Black, search recovery, undo, and changes to thinking time passed');
-  await webview.getByText('Game options', { exact: true }).click();
+  await webview.getByText('Draw & resign', { exact: true }).click();
   await byButton('Resign').click();
   await webview.getByRole('dialog').getByRole('button', { name: 'Resign', exact: true }).click();
-  await text(status, 'White wins · Resignation');
+  await text(status, 'Stockfish wins · Resignation');
   assert.deepEqual(await engineThreads(), []);
   console.log('No Stockfish worker after resignation');
+
+  await byButton('Analyze game').click();
+  await webview.locator('.review-score').first().waitFor();
+  await webview.locator('.review-arrow.visible').waitFor();
+  await webview.locator('.review-line').first().click();
+  await webview.locator('.review-steps button').first().click();
+  await byButton('Return to position').waitFor();
+  await byButton('Return to position').click();
+  await byButton('Start position').click();
+  await webview.getByText(/^Position 0 \/ /).waitFor();
+  await byButton('Back to game').click();
+  await text(status, 'Stockfish wins · Resignation');
+  console.log('Game analysis and variation preview left the result intact');
 
   await page.keyboard.press('F1');
   const palette = page.locator('.quick-input-widget input');
@@ -228,7 +301,7 @@ try {
   const appeared = await iframe.waitFor({ timeout: 4000 }).then(() => true, () => false);
   if (!appeared && await activity.getAttribute('aria-selected') !== 'true') await activity.click();
   try {
-    await text(status, 'White wins · Resignation');
+    await text(status, 'Stockfish wins · Resignation');
   } catch (error) {
     console.log('Reload diagnostics', {
       selected: await activity.getAttribute('aria-selected').catch(() => null),
