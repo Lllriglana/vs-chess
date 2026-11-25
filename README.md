@@ -1,43 +1,41 @@
 # VS Chess
 
-Play chess in the Visual Studio Code sidebar against Stockfish or a second player sharing your computer. Both modes run offline.
+<img src="media/screenshot.png" align="right" width="232" alt="A game against Stockfish in the VS Code sidebar">
 
-- Play White or Black against bundled Stockfish 19 Lite WASM. Choose from six difficulty levels and five thinking times. Ratings are indicative.
-- Play a two-player game with optional Fischer clocks and automatic board rotation.
-- Move by clicking, dragging, or using the keyboard. The board marks legal destinations, the last move, and check. Choose any of the four promotion pieces.
-- Review moves in algebraic notation, undo, flip the board, or restart. VS Code saves one game per workspace and remembers your settings in your profile.
-- Pick a Classic, Minimal, or Dark board and switch between illustrated and lettered pieces.
+Play a game or solve a puzzle without leaving your editor. VS Chess runs offline in a movable VS Code sidebar.
 
-![An in-progress game against Stockfish in the VS Code sidebar](media/screenshot.png)
+- **Play Stockfish** as White, Black, or a random color. Pick from 16 difficulty settings and set how long the engine thinks.
+- **Play a friend** on the same computer, with optional clocks and auto-flip.
+- **Train with 9,781 puzzles** from Lichess. Filter by rating or practice mates, forks, pins, sacrifices, and endgames.
 
-## Install and play
+## Install
 
-Use desktop VS Code 1.101 or newer. In the Extensions view, open the overflow menu and choose **Install from VSIX…**. Select the downloaded package. You can also install from a terminal.
+Use desktop VS Code 1.101 or later. In the Command Palette, run **Extensions: Install from VSIX…** and select the `.vsix` file. Open **VS Chess** from the Activity Bar.
 
-```sh
-code --install-extension outputs/vs-chess-0.1.0-local.vsix
-```
+## At the board
 
-Choose **VS Chess** in the Activity Bar. Select a game mode, then configure your color or time control. To move the view, drag its title or use VS Code's **Move View** command. Use arrow keys to move among board squares, Enter or Space to select, and Escape to clear the selection.
+Click or drag a piece to move it. With the board focused, use the arrow keys to navigate and **Enter** or **Space** to select. **Moves** opens the game history. Drag the view title to move the board to another sidebar or panel.
 
-For threefold repetition or the 50-move rule, open **Game options** and choose **Claim draw** when available. To claim based on your next move, choose **Claim with a move** and enter that move. Fivefold repetition and 75 moves without a capture or pawn move end the game automatically. A checkmate on the final move takes precedence. Both local players can agree a draw in **Game options**.
+Choose **Puzzles** from the start screen or below a game in progress. **Hint** marks the piece to move. **Show solution** plays the rest of the line and leaves it below the board. **Back to games** resumes your game.
 
-Timed games begin on **Start game**. The clock pauses when the chess view is hidden or the window closes. Undo restores the clocks to just before the undone move. Against Stockfish, Undo returns to the last position where you could choose a different move.
+After a game, choose **Analyze game**. An arrow shows Stockfish's best move on the board. Hover over another suggestion or select it to see its arrow. Selecting a suggestion opens its continuation so you can play through it one move at a time. Use the buttons beneath the board or open **Moves** to revisit a position. Scores are from White's perspective, and the move played in the game is marked.
 
-## Development
+Change the interface language in **Settings → Language**.
 
-Use Node.js 22.22 or later and npm. Install dependencies, run the tests, and build the extension.
+Games are saved per workspace. Settings and solved puzzles are saved in your VS Code profile. Clocks pause when the view is hidden or while you solve a puzzle.
+
+## Build from source
+
+Use Node.js 22.22 or later.
 
 ```sh
 npm ci
 npm test
-npm run build
+npm run vsix
 ```
 
-Open this folder in VS Code and press **F5** to launch the Extension Development Host. To build the local VSIX, run `npm run vsix`. Its first run fetches and verifies the corresponding Stockfish source and network.
+The package is written to `outputs/`. To work on the extension in VS Code, open the project and press **F5**.
 
-## Privacy and license
+## Credits
 
-Game state and preferences stay in VS Code's local storage. VS Chess sends no telemetry and makes no network requests at runtime.
-
-VS Chess is distributed under GPL-3.0-only. The VSIX includes the license texts and corresponding source for the distributed code. See [Third-party notices](THIRD_PARTY_NOTICES.md) for provenance and build instructions.
+VS Chess is licensed under GPL-3.0-only. It uses [Stockfish.js](https://github.com/nmrugg/stockfish.js), [chess.js](https://github.com/jhlywa/chess.js), and [Lichess puzzles](https://database.lichess.org/#puzzles). See the [third-party notices](THIRD_PARTY_NOTICES.md) for licenses and [puzzle pack notes](data/README.md) for the data sources.

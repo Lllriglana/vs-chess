@@ -1,8 +1,8 @@
 {
   "name": "vs-chess",
   "displayName": "VS Chess",
-  "description": "Play offline chess in the VS Code sidebar against Stockfish or a second player on the same computer.",
-  "version": "0.1.0",
+  "description": "Play chess against Stockfish or a friend, and solve 9,781 tactical puzzles in the VS Code sidebar. Works offline.",
+  "version": "0.3.2",
   "license": "GPL-3.0-only",
   "engines": {
     "vscode": "^1.101.0"
@@ -15,7 +15,9 @@
     "stockfish",
     "board game",
     "offline",
-    "local multiplayer"
+    "local multiplayer",
+    "chess puzzles",
+    "lichess"
   ],
   "icon": "media/icon.png",
   "galleryBanner": {
