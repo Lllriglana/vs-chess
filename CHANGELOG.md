@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Add an animated demo and a direct Marketplace installation link.
+
 ## 0.3.2
 
 - Show Stockfish's suggestions as arrows on the review board.

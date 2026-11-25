@@ -1,32 +1,24 @@
 # VS Chess
 
-<img src="media/screenshot.png" align="right" width="232" alt="A game against Stockfish in the VS Code sidebar">
+A chessboard in your VS Code sidebar. Play Stockfish, solve a puzzle, or look back at a finished game. Everything runs offline.
 
-Play a game or solve a puzzle without leaving your editor. VS Chess runs offline in a movable VS Code sidebar.
-
-- **Play Stockfish** as White, Black, or a random color. Pick from 16 difficulty settings and set how long the engine thinks.
-- **Play a friend** on the same computer, with optional clocks and auto-flip.
-- **Train with 9,781 puzzles** from Lichess. Filter by rating or practice mates, forks, pins, sacrifices, and endgames.
+![VS Chess demo showing a knight move, Stockfish's reply, and a suggested move in game review.](media/vs-chess-demo.gif)
 
 ## Install
 
-Use desktop VS Code 1.101 or later. In the Command Palette, run **Extensions: Install from VSIX…** and select the `.vsix` file. Open **VS Chess** from the Activity Bar.
+Install [VS Chess from the Marketplace](https://marketplace.visualstudio.com/items?itemName=llriglana.vs-chess) in desktop VS Code 1.101 or later. Click the knight in the Activity Bar to open the board.
 
-## At the board
+## Play, practice, and review
 
-Click or drag a piece to move it. With the board focused, use the arrow keys to navigate and **Enter** or **Space** to select. **Moves** opens the game history. Drag the view title to move the board to another sidebar or panel.
+- **Play.** Pick one of 16 Stockfish levels and play White, Black, or a random side. For a game on the same computer, choose **Two players**. Use a clock if you like.
+- **Practice.** The 9,781 Lichess puzzles can be filtered by rating and theme. **Hint** points to the piece to move, and **Show solution** plays the line. Your game pauses while you solve puzzles.
+- **Review.** After the game, choose **Analyze game**. Stockfish draws an arrow for its best move in the current position. Go back one move to compare what you played with the alternatives. Select a line to play through it on the board. Scores are shown from White's side.
 
-Choose **Puzzles** from the start screen or below a game in progress. **Hint** marks the piece to move. **Show solution** plays the rest of the line and leaves it below the board. **Back to games** resumes your game.
-
-After a game, choose **Analyze game**. An arrow shows Stockfish's best move on the board. Hover over another suggestion or select it to see its arrow. Selecting a suggestion opens its continuation so you can play through it one move at a time. Use the buttons beneath the board or open **Moves** to revisit a position. Scores are from White's perspective, and the move played in the game is marked.
-
-Change the interface language in **Settings → Language**.
-
-Games are saved per workspace. Settings and solved puzzles are saved in your VS Code profile. Clocks pause when the view is hidden or while you solve a puzzle.
+Move by clicking, dragging, or using the arrow keys and Enter when the board is focused. For more space, drag the view title to another sidebar. Change the interface language under **Settings → Language**.
 
 ## Build from source
 
-Use Node.js 22.22 or later.
+Requires Node.js 22.22 or later.
 
 ```sh
 npm ci
@@ -34,8 +26,10 @@ npm test
 npm run vsix
 ```
 
-The package is written to `outputs/`. To work on the extension in VS Code, open the project and press **F5**.
+Find the package in `outputs/`. To work on the extension, open the repository in VS Code, run `npm run build`, then press **F5**.
 
-## Credits
+## License and credits
 
-VS Chess is licensed under GPL-3.0-only. It uses [Stockfish.js](https://github.com/nmrugg/stockfish.js), [chess.js](https://github.com/jhlywa/chess.js), and [Lichess puzzles](https://database.lichess.org/#puzzles). See the [third-party notices](THIRD_PARTY_NOTICES.md) for licenses and [puzzle pack notes](data/README.md) for the data sources.
+VS Chess is licensed under GPL-3.0-only. The engine is [Stockfish.js](https://github.com/nmrugg/stockfish.js), the rules use [chess.js](https://github.com/jhlywa/chess.js), and the puzzles come from [Lichess](https://database.lichess.org/#puzzles). See the [third-party notices](THIRD_PARTY_NOTICES.md) and [puzzle pack notes](data/README.md).
+
+[Report a bug or suggest a change](https://github.com/Lllriglana/vs-chess/issues/new/choose).
