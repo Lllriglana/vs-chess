@@ -43,7 +43,6 @@ button.secondary:not(:disabled):hover, button.quiet:hover { background: var(--se
 h1, h2, p { margin: 0; }
 h1 { font-size: 26px; font-weight: 650; letter-spacing: -.035em; }
 h2 { font-size: 16px; font-weight: 650; }
-.home-subtitle { color: var(--muted); margin: 3px 0 21px; }
 .home-actions, .mode-stack { display: grid; gap: 7px; }
 .home-actions button { min-height: 34px; }
 .game { display: grid; gap: 7px; min-width: 0; }
@@ -81,7 +80,7 @@ body[data-board-theme="dark"] {
   --grain-light: none; --grain-dark: none; --last: #e8c95b73; --selected: #7bddb59f; --target: #142e25dd;
 }
 .board {
-  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; aspect-ratio: 1;
+  position: relative; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; aspect-ratio: 1;
   border: 1px solid var(--line); border-radius: 4px; overflow: hidden; isolation: isolate;
   container-type: inline-size; user-select: none;
 }
@@ -104,6 +103,11 @@ body[data-board-theme="dark"] {
   position: absolute; inset: 0; display: grid; place-items: center; z-index: 1;
   pointer-events: none;
 }
+.piece-grip { display: grid; place-items: center; width: 94%; aspect-ratio: 1; }
+.piece-grip:has(.piece-letter) { width: 64%; }
+.piece-grip > .piece, .piece-grip > .piece-letter { width: 100%; height: 100%; pointer-events: none; }
+.piece-grip[draggable="true"] { pointer-events: auto; cursor: grab; }
+.piece-grip[draggable="true"]:active { cursor: grabbing; }
 .piece { width: 94%; height: 94%; overflow: visible; }
 .piece.w { --fill: #fbf0d9; --stroke: #303a35; --detail: #746b58; }
 .piece.b { --fill: #293633; --stroke: #e0d8bf; --detail: #b9b7a2; }
@@ -129,11 +133,27 @@ body[data-board-theme="dark"] {
   display: grid; align-items: center; font-size: 12px; font-weight: 550;
 }
 .game-status.ended { border-color: var(--focus); }
+.game-status.mate {
+  border-inline-start-width: 3px;
+  background: color-mix(in srgb, var(--focus) 13%, var(--panel));
+  font-size: 14px;
+  font-weight: 700;
+}
+.mating-player .player-icon { border-color: var(--focus); }
 .tool-status, .hint { font-size: 12px; color: var(--muted); }
 .toolbar {
-  display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 4px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
 }
-.toolbar button { padding-inline: 2px; white-space: nowrap; font-size: 11px; }
+.toolbar button {
+  min-height: 34px; padding-inline: 6px; font-size: 12px; line-height: 1.25;
+  overflow-wrap: normal; word-break: normal;
+}
+@media (min-width: 400px) {
+  .toolbar { grid-template-columns: repeat(4, minmax(min-content, 1fr)); }
+}
+@media (max-width: 175px) {
+  .toolbar { grid-template-columns: 1fr; }
+}
 details { border-top: 1px solid var(--line); }
 summary { cursor: pointer; padding: 6px 2px; font-size: 12px; color: var(--muted); }
 summary:hover { color: var(--ink); }
@@ -142,7 +162,7 @@ summary:hover { color: var(--ink); }
 .move-pair:nth-child(odd) { background: var(--secondary-hover); }
 .move-index { color: var(--muted); }
 .more-actions { display: flex; flex-wrap: wrap; gap: 3px; }
-.more-actions button { font-size: 11px; }
+.more-actions button { color: var(--ink); font-size: 11px; }
 .notice {
   position: fixed; inset: auto 10px 10px; z-index: 5; background: var(--input);
   border: 1px solid var(--focus); padding: 7px 9px; border-radius: 5px;
@@ -170,6 +190,59 @@ select {
   #app { padding: 8px; }
   .game { gap: 5px; }
 }
-@media (max-width: 235px) {
-  .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.home h1 { margin-bottom: 16px; }
+.game-links { display: grid; gap: 6px; }
+.game-links > button { justify-self: start; }
+.puzzle-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; }
+.puzzle-header button { padding-inline: 0; }
+.puzzle-details, .puzzle-solution { color: var(--muted); font-size: 12px; }
+.puzzle-details { font-variant-numeric: tabular-nums; }
+.puzzle-toolbar { display: flex; flex-wrap: wrap; gap: 4px; }
+.puzzle-toolbar button { flex: 1 1 auto; }
+.puzzle-solution { padding: 4px 0; }
+/* A two-tone rim stays visible on light and dark board squares. */
+.square.puzzle-hint:not(.selected)::before { background: #ffcf5770; }
+.square.puzzle-hint::after {
+  content: ''; position: absolute; inset: 2px; border: 3px solid #ffcf57;
+  box-shadow: 0 0 0 1px #302000, inset 0 0 0 1px #302000;
+  pointer-events: none; z-index: 3;
+}
+.game-status.hint-active {
+  border-inline-start: 3px solid #ffcf57;
+  background: color-mix(in srgb, #ffcf57 14%, var(--panel));
+  font-weight: 650;
+}
+
+.review-header > button { padding-inline: 0; }
+.review-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.review-at { flex: 1 1 auto; color: var(--muted); font-size: 12px; }
+button.review-control { min-width: 30px; min-height: 30px; padding: 0 5px; font-size: 18px; line-height: 1; color: var(--ink); }
+.game-status.review-status {
+  min-height: 0; border: 0; padding: 0 2px; color: var(--muted); font-weight: 400;
+}
+.review-arrow {
+  position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%;
+  visibility: hidden; pointer-events: none;
+  fill: #91ecc3; stroke: #172821; stroke-width: .045; stroke-linejoin: round;
+}
+.review-arrow.visible { visibility: visible; }
+.review-arrow.alternative { fill: #ffd487; stroke: #38261b; }
+.review-played { color: var(--muted); font-size: 12px; }
+.review-lines { display: grid; gap: 2px; min-width: 0; }
+.review-option + .review-option { border-top: 1px solid var(--line); }
+button.review-line {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto 8px; align-items: center;
+  width: 100%; min-height: 30px; padding: 3px 5px; gap: 6px; text-align: start; color: var(--ink);
+}
+button.review-line[aria-expanded="true"] { background: var(--secondary-hover); }
+.review-line-notes { display: flex; flex-wrap: wrap; gap: 2px 6px; color: var(--muted); font-size: 11px; }
+.review-line-notes .review-best { color: var(--ink); }
+.review-score { font-variant-numeric: tabular-nums; }
+.review-disclosure { color: var(--muted); }
+.review-line[aria-expanded="true"] .review-disclosure { transform: rotate(90deg); }
+.review-steps { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px 4px; }
+.review-steps button, .move-pair button { padding: 2px 4px; min-height: 24px; text-align: start; color: var(--ink); }
+.review-steps button[aria-pressed="true"], .move-pair button[aria-current] {
+  background: var(--button); color: var(--button-ink);
 }
