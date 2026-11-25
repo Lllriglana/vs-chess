@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/chess/game';
-import { defaults, parseAction, parseResponse, type MoveInput, type Setup } from '../src/shared/protocol';
+import { defaults, levels, parseAction, parseResponse, type MoveInput, type Setup } from '../src/shared/protocol';
 
 const local: Setup = { mode: 'local', color: 'w', control: 'off' };
 const timed: Setup = { ...local, control: '3+2' };
@@ -75,6 +75,7 @@ test('threefold claims work on current and intended positions and survive save/l
   move(game, 'g1', 'f3'); move(game, 'g8', 'f6'); move(game, 'f3', 'g1');
   const restored = Game.restore(JSON.parse(JSON.stringify(game.save(0))))!;
   assert.equal(restored.turn, 'b');
+  assert.deepEqual(view(restored).claimMoves, [input('f6', 'g8')]);
   assert.equal(restored.claim(0, input('a7', 'a6')), false);
   assert.equal(restored.claim(0, input('f6', 'g8')), true);
   assert.equal(restored.result?.reason, 'Threefold repetition claimed');
@@ -94,6 +95,7 @@ test('fivefold repetition ends the game automatically', () => {
 test('50-move claim, 75-move draw, and checkmate priority', () => {
   const fifty = new Game(local, '4k3/8/8/8/8/8/R7/4K3 w - - 99 1');
   assert.equal(fifty.claim(0), false);
+  assert.ok(view(fifty).claimMoves.some(move => move.from === 'a2' && move.to === 'a3'));
   assert.equal(fifty.claim(0, input('a2', 'a3')), true);
   assert.equal(fifty.result?.reason, '50-move rule claimed');
   const seventyFive = new Game(local, '4k3/8/8/8/8/8/R7/4K3 w - - 149 1');
@@ -169,9 +171,15 @@ test('webview actions validate names, settings and full move shapes', () => {
   assert.equal(parseAction({ type: 'move', revision: 2, move: { from: 'e2', to: 'z6' } }), undefined);
   assert.equal(parseAction({ type: 'move', revision: 2, move: { from: 'e2', to: 'e4', promotion: 'k' } }), undefined);
   assert.equal(parseAction({ type: 'move', revision: -1, move: input('e2', 'e4') }), undefined);
-  assert.equal(parseAction({ type: 'settings', preferences: { ...defaults, level: 10 } }), undefined);
+  assert.equal(parseAction({ type: 'settings', preferences: { ...defaults, level: levels.length } }), undefined);
   assert.deepEqual(parseAction({ type: 'start', revision: null, setup: { ...local, extra: 'ignored' } }),
     { type: 'start', revision: null, setup: local });
+  const randomSetup = { mode: 'computer', color: 'w', control: 'off', randomColor: true } as const;
+  assert.deepEqual(parseAction({ type: 'start', setup: randomSetup, revision: null }),
+    { type: 'start', setup: randomSetup, revision: null });
+  assert.equal(parseAction({ type: 'start', setup: { ...local, randomColor: true }, revision: null }), undefined);
+  assert.deepEqual(Game.restore(new Game({ ...randomSetup, color: 'b' }).save(0))?.setup,
+    { ...randomSetup, color: 'b' });
   const position = view(new Game(timed));
   const state = { preferences: defaults, position };
   assert.deepEqual(parseResponse({ type: 'state', state }), { type: 'state', state });

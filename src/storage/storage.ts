@@ -1,8 +1,9 @@
 import type { Memento } from 'vscode';
 import { Game } from '../chess/game';
-import { defaults, isPreferences, type Preferences } from '../shared/protocol';
+import { defaults, isPreferences, record, type Preferences } from '../shared/protocol';
 
 const gameKey = 'vsChess.game.v1';
+const solvedPuzzlesKey = 'vsChess.solvedPuzzles.v1';
 const preferencesKey = 'vsChess.preferences.v1';
 
 export class Storage {
@@ -14,7 +15,17 @@ export class Storage {
   loadGame() { return Game.restore(this.workspace.get(gameKey)); }
   loadPreferences() {
     const value = this.profile.get(preferencesKey);
-    return isPreferences(value) ? value : { ...defaults };
+    const migrated = record(value) && value.language === undefined ? { ...value, language: defaults.language } : value;
+    return isPreferences(migrated) ? migrated : { ...defaults };
+  }
+  loadSolvedPuzzles() {
+    const saved = this.profile.get<unknown>(solvedPuzzlesKey);
+    return new Set(Array.isArray(saved) ? saved.filter((id): id is string =>
+      typeof id === 'string' && /^[A-Za-z0-9]{5}$/.test(id)) : []);
+  }
+  saveSolvedPuzzles(solved: ReadonlySet<string>) {
+    const snapshot = [...solved];
+    this.enqueue(() => this.profile.update(solvedPuzzlesKey, snapshot));
   }
   saveGame(game: Game, now: number) {
     const snapshot = game.save(now);

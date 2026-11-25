@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { PuzzlePack, type Puzzle, type PuzzleSession } from '../puzzles/puzzles';
+import { defaultPuzzleFilter, type PuzzleFilter } from '../shared/puzzles';
+import { Review } from '../analysis/review';
 import { Game } from '../chess/game';
 import { Stockfish } from '../engine/stockfish';
 import { Storage } from '../storage/storage';
@@ -21,6 +25,12 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
   private readonly storage: Storage;
   private readonly engine: Stockfish;
   private game?: Game;
+  private review?: Review;
+  private puzzle?: PuzzleSession;
+  private puzzlesOpen = false;
+  private puzzles?: PuzzlePack;
+  private puzzleFilter = defaultPuzzleFilter;
+  private readonly solvedPuzzles: Set<string>;
   private preferences: Preferences;
   private revision = 0;
   private search?: AbortController;
@@ -37,6 +47,7 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
     });
     this.engine = new Stockfish(vscode.Uri.joinPath(context.extensionUri, 'dist', 'stockfish-19-lite-single.js').fsPath);
     this.game = this.storage.loadGame();
+    this.solvedPuzzles = this.storage.loadSolvedPuzzles();
     this.preferences = this.storage.loadPreferences();
   }
 
@@ -88,6 +99,22 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
   }
   private notice(message: string) { this.post({ type: 'notice', message }); }
   private state() {
+    if (this.review) {
+      this.post({ type: 'state', state: {
+        preferences: this.preferences, position: this.review.view(this.preferences, this.revision), review: this.review.info()
+      } });
+      return;
+    }
+    if (this.puzzlesOpen && this.puzzle) {
+      const puzzle = this.puzzle;
+      this.post({ type: 'state', state: {
+        preferences: this.preferences,
+        position: puzzle.view(this.preferences, this.revision),
+        puzzle: { id: puzzle.id, rating: puzzle.rating, status: puzzle.status,
+          filter: this.puzzleFilter, hint: puzzle.hint, solved: this.solvedPuzzles.size }
+      } });
+      return;
+    }
     this.post({ type: 'state', state: {
       preferences: this.preferences,
       position: this.game?.view(this.preferences, this.revision, !!this.search, this.engineError)
@@ -113,7 +140,7 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
   private scheduleClock(now: number) {
     clearTimeout(this.alarm);
     const deadline = this.game?.deadline;
-    if (!this.active || deadline === undefined) return;
+    if (!this.active || this.puzzlesOpen || deadline === undefined) return;
     this.alarm = setTimeout(() => {
       const current = Date.now();
       if (this.game?.expire(current)) this.changed(current);
@@ -123,7 +150,7 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
   }
   private scheduleBot() {
     const game = this.game;
-    if (!this.active || !game?.botTurn || this.search || this.engineError) return;
+    if (!this.active || this.puzzlesOpen || this.review || !game?.botTurn || this.search || this.engineError) return;
     const now = Date.now();
     if (game.claim(now)) {
       this.revision++;
@@ -154,29 +181,172 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
     this.scheduleBot();
     this.state();
   }
+  private nextPuzzle(filter: PuzzleFilter, now: number) {
+    try {
+      if (!this.puzzles) {
+        const file = vscode.Uri.joinPath(this.context.extensionUri, 'data', 'puzzles.json').fsPath;
+        this.puzzles = new PuzzlePack(JSON.parse(readFileSync(file, 'utf8')) as Puzzle[]);
+      }
+      const next = this.puzzles.next(filter, this.solvedPuzzles, this.puzzle?.id);
+      if (!next) {
+        this.notice('No other puzzles match these filters.');
+        return;
+      }
+      this.puzzle = next;
+      this.puzzleFilter = filter;
+      this.openPuzzles(now);
+    } catch (error) {
+      this.log.error(String(error));
+      this.notice('Could not open the puzzle pack.');
+    }
+  }
+  private openPuzzles(now: number) {
+    if (!this.puzzle) {
+      this.nextPuzzle(this.puzzleFilter, now);
+      return;
+    }
+    if (!this.puzzlesOpen) this.suspend();
+    this.puzzlesOpen = true;
+    this.revision++;
+    this.state();
+  }
+  private handlePuzzle(action: Action) {
+    const puzzle = this.puzzle;
+    if (!puzzle || !('revision' in action) || action.revision !== this.revision) {
+      this.state();
+      return;
+    }
+    switch (action.type) {
+      case 'move':
+        if (!puzzle.solveMove(action.move)) {
+          this.notice('Try another move.');
+          return;
+        }
+        if (puzzle.status === 'solved' && !this.solvedPuzzles.has(puzzle.id)) {
+          this.solvedPuzzles.add(puzzle.id);
+          this.storage.saveSolvedPuzzles(this.solvedPuzzles);
+        }
+        break;
+      case 'puzzleHint':
+        puzzle.showHint();
+        this.state();
+        return;
+      case 'puzzleReveal': puzzle.reveal(); break;
+      case 'puzzleRetry': this.puzzle = puzzle.retry(); break;
+      default: return;
+    }
+    this.revision++;
+    this.state();
+  }
+  private scheduleReview() {
+    const review = this.review;
+    if (!this.active || !review || this.search || review.hasLines || review.failed || review.terminal) return;
+    const controller = new AbortController();
+    this.search = controller;
+    const position = review.enginePosition;
+    const playedMove = review.playedMove;
+    void this.engine.analyze(position, controller.signal).then(async lines => {
+      if (this.search !== controller) return;
+      let playedLine;
+      if (playedMove && !lines.some(line => line.moves[0] === playedMove)) {
+        try { [playedLine] = await this.engine.analyze(position, controller.signal, playedMove); }
+        catch (error) { if (!controller.signal.aborted) this.log.error(String(error)); }
+      }
+      if (this.search !== controller) return;
+      review.accept(lines, playedLine);
+      this.search = undefined;
+      this.state();
+    }).catch(error => {
+      if (this.search !== controller || controller.signal.aborted) return;
+      this.search = undefined;
+      review.failed = true;
+      this.log.error(String(error));
+      this.state();
+    });
+  }
+  private handleReview(action: Action) {
+    const review = this.review;
+    if (!review) return;
+    switch (action.type) {
+      case 'reviewClose':
+        this.cancelSearch();
+        this.review = undefined;
+        break;
+      case 'reviewSeek':
+        if (!review.seek(action.ply)) return;
+        this.cancelSearch();
+        break;
+      case 'reviewPreview':
+        if (!review.show(action.line, action.step)) return;
+        break;
+      case 'reviewRetry':
+        review.failed = false;
+        break;
+      default: return;
+    }
+    this.revision++;
+    this.scheduleReview();
+    this.state();
+  }
   private handle(action: Action) {
     const now = Date.now();
     if (action.type === 'ready') {
       this.ready = true;
       if (!this.active) return;
+      if (!this.puzzlesOpen && !this.review) this.game?.resume(now);
+      this.scheduleClock(now);
+      this.scheduleBot();
+      this.scheduleReview();
+      this.state();
+      return;
+    }
+    if (!this.active) return;
+    if (this.review && action.type !== 'settings') {
+      this.handleReview(action);
+      return;
+    }
+    if (action.type === 'reviewOpen') {
+      if (!this.game?.result || this.puzzlesOpen) return;
+      this.cancelSearch();
+      this.review = new Review(this.game.save(now), this.game.view(this.preferences, this.revision, false, false));
+      this.revision++;
+      this.scheduleReview();
+      this.state();
+      return;
+    }
+    if (action.type === 'puzzleOpen') {
+      this.openPuzzles(now);
+      return;
+    }
+    if (action.type === 'puzzleClose') {
+      if (!this.puzzlesOpen) return;
+      this.puzzlesOpen = false;
+      this.revision++;
       this.game?.resume(now);
       this.scheduleClock(now);
       this.scheduleBot();
       this.state();
       return;
     }
-    if (!this.active) return;
+    if (action.type === 'puzzleNext') {
+      if (this.puzzlesOpen) this.nextPuzzle(action.filter, now);
+      return;
+    }
     if (action.type === 'settings') {
       const changedEngine = action.preferences.level !== this.preferences.level
         || action.preferences.thinkMs !== this.preferences.thinkMs;
       this.preferences = action.preferences;
       this.storage.savePreferences(this.preferences);
-      if (changedEngine) {
+      if (changedEngine && !this.review) {
         this.engineError = false;
         this.cancelSearch();
         this.scheduleBot();
       }
       this.state();
+      return;
+    }
+    if (this.puzzlesOpen) {
+      this.handlePuzzle(action);
       return;
     }
     if (action.type === 'retry') {
@@ -185,14 +355,15 @@ class ChessView implements vscode.WebviewViewProvider, vscode.Disposable {
       this.state();
       return;
     }
-    if (action.revision !== (this.game ? this.revision : null)) {
+    if (!('revision' in action) || action.revision !== (this.game ? this.revision : null)) {
       this.state();
       this.notice('The position changed. Try again.');
       return;
     }
     if (action.type === 'start') {
       this.cancelSearch();
-      this.game = new Game(action.setup);
+      const setup = action.setup;
+      this.game = new Game(setup.randomColor ? { ...setup, color: randomInt(2) === 0 ? 'w' : 'b' } : setup);
       this.game.resume(now);
       this.changed(now);
       return;

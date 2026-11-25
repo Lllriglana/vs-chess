@@ -21,3 +21,7 @@ Copyright Jeff Hlywa. The BSD 2-Clause notice is included. The VSIX contains the
 The VSIX includes the TypeScript, stylesheet, original artwork, manifests, and build scripts. To inspect them, extract the VSIX as a ZIP archive and open its `extension/` directory. Build with `npm ci` and `npm run build`.
 
 Preserve copyright notices and license texts when redistributing. Provide the corresponding source for the exact binaries you distribute in accordance with the GPL. If you modify the GPL-covered code, preserve the required notices, identify the changes, and supply the modified corresponding source. [GNU GPL version 3](https://www.gnu.org/licenses/gpl-3.0.html)
+
+## Lichess puzzles
+
+The bundled tactics are derived from the Lichess open puzzle database and remain available under CC0 1.0. See [puzzle pack notes](data/README.md) for the sources and data format.
