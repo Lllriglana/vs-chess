@@ -66,7 +66,7 @@ for (const [file, hash] of [
 }
 await Promise.all([
   ...sourceFiles.map(materialize),
-  ...['dist', 'src', 'licenses', 'scripts', 'media', 'test'].map(dir => cp(dir, `${root}/${dir}`, { recursive: true })),
+  ...['dist', 'src', 'licenses', 'scripts', 'media', 'test', 'data'].map(dir => cp(dir, `${root}/${dir}`, { recursive: true })),
   ...['README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'tsconfig.json',
     '.vscodeignore', 'package-lock.json'].map(file => copyFile(file, `${root}/${file}`))
 ]);
