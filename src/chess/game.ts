@@ -97,6 +97,14 @@ export class Game {
       return 'Threefold repetition claimed';
     }
   }
+  private intendedDrawMoves(legal: Move[]): MoveInput[] {
+    const nearFifty = Number(this.chess.fen().split(' ')[4]) >= 99;
+    if (!nearFifty && ![...this.occurrences.values()].some(count => count >= 2)) return [];
+    return legal.filter(move =>
+      Number(move.after.split(' ')[4]) >= 100
+      || (this.occurrences.get(move.after.split(' ', 4).join(' ')) ?? 0) >= 2
+    ).map(moveInput);
+  }
   private settle(now: number) {
     if (!this.remaining || this.startedAt === null) return;
     this.remaining[this.turn] = Math.max(0, this.remaining[this.turn] - Math.max(0, now - this.startedAt));
@@ -207,12 +215,15 @@ export class Game {
     const blackAtBottom = this.setup.mode === 'computer'
       ? this.setup.color === 'b' : preferences.autoFlip && this.turn === 'b';
     const last = this.moves.at(-1);
+    const humanTurn = !this.ending && !this.botTurn;
+    const legal = humanTurn ? this.chess.moves({ verbose: true }) : [];
+    const claim = humanTurn ? this.drawClaim() : undefined;
     return {
       revision, setup: this.setup, flipped: blackAtBottom !== this.flip, turn: this.turn, pieces,
-      legal: this.ending || this.botTurn ? [] : this.chess.moves({ verbose: true }).map(moveInput),
+      legal: legal.map(moveInput),
       history: this.moves.map(move => move.san), last: last && moveInput(last), check: king,
       result: this.ending, clock: this.remaining && { remaining: { ...this.remaining }, startedAt: this.startedAt },
-      canUndo: this.canUndo, claim: this.ending || this.botTurn ? undefined : this.drawClaim(),
+      canUndo: this.canUndo, claim, claimMoves: claim || !humanTurn ? [] : this.intendedDrawMoves(legal),
       thinking, engineError
     };
   }
